@@ -9,6 +9,35 @@ interface ChatMessageProps {
   message: ChatMessageType;
 }
 
+const DEBUG = process.env.NODE_ENV === 'development';
+function debugLog(...args: any[]) {
+  if (DEBUG) {
+    console.debug('[ChatMessage]', ...args);
+  }
+}
+
+function processBadge(badge: any) {
+  // Für Channel-Badges (Format: { "vip": "1" })
+  if (typeof badge === 'object' && Object.keys(badge).length === 1) {
+    const [setID, version] = Object.entries(badge)[0];
+    return {
+      setID,
+      version: String(version)
+    };
+  }
+  
+  // Für Homepage-Badges (Format: { setID: "...", version: "..." })
+  if (badge.setID) {
+    return {
+      setID: badge.setID,
+      version: String(badge.version || '1')
+    };
+  }
+
+  console.warn('[ChatMessage] Unknown badge format:', badge);
+  return null;
+}
+
 export default function ChatMessage({ message }: ChatMessageProps) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [chatColor, setChatColor] = useState<string>('#9147FF');
@@ -31,16 +60,70 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   useEffect(() => {
     async function loadBadgeUrls() {
-      const urls = new Map<string, string>();
-      for (const badge of message.badges) {
-        const url = await getBadgeUrl(badge.setID, badge.version);
-        urls.set(badge.setID, url);
+      if (!message.badges || !Array.isArray(message.badges)) {
+        return;
       }
-      setBadgeUrls(urls);
+
+      console.log('Raw badge data (stringified):', JSON.stringify(message.badges, null, 2));
+      console.log('Badge data type:', typeof message.badges);
+      console.log('Is array?', Array.isArray(message.badges));
+      console.log('First badge:', message.badges[0]);
+      
+      try {
+        const urls = new Map<string, string>();
+        
+        const badgeEntries = message.badges
+          .map(processBadge)
+          .filter((entry): entry is { setID: string; version: string } => entry !== null);
+
+        console.log('Processed badge entries:', badgeEntries);
+
+        if (DEBUG && badgeEntries.length > 0) {
+          debugLog('Processing badges:', badgeEntries);
+        }
+
+        const results = await Promise.all(
+          badgeEntries.map(async badge => {
+            const url = await getBadgeUrl(badge.setID, badge.version);
+            return { setID: badge.setID, url };
+          })
+        );
+
+        results.forEach(({ setID, url }) => {
+          if (url) {
+            urls.set(setID, url);
+          } else {
+            debugLog('Failed to load URL for badge:', setID);
+          }
+        });
+        
+        if (urls.size > 0) {
+          debugLog('Loaded badge URLs:', [...urls.entries()]);
+        } else {
+          debugLog('No valid badge URLs loaded');
+        }
+        
+        setBadgeUrls(urls);
+      } catch (error) {
+        console.error('[ChatMessage] Error loading badge URLs:', error);
+      }
     }
 
     loadBadgeUrls();
   }, [message.badges]);
+
+  const badges = Array.isArray(message.badges) 
+    ? message.badges
+        .map(processBadge)
+        .filter((entry): entry is { setID: string; version: string; title: string } => {
+          if (!entry) return false;
+          return { ...entry, title: entry.setID };
+        })
+    : [];
+
+  if (DEBUG && badges.length > 0) {
+    debugLog('Processed badges for rendering:', badges);
+  }
 
   return (
     <div className="group px-4 py-2 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all duration-200">
@@ -64,19 +147,22 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         <div className="flex-grow min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <div className="flex -space-x-1">
-              {message.badges.map((badge, index) => {
+              {badges.map((badge, index) => {
                 const badgeUrl = badgeUrls.get(badge.setID);
-                if (!badgeUrl) return null;
+                if (!badgeUrl) {
+                  debugLog('No URL for badge:', badge.setID);
+                  return null;
+                }
                 
                 return (
                   <div 
-                    key={index}
+                    key={`${badge.setID}-${index}`}
                     className="w-4 h-4 rounded-full overflow-hidden ring-1 ring-white dark:ring-gray-800"
-                    title={badge.title}
+                    title={badge.title || badge.setID}
                   >
                     <img 
                       src={badgeUrl}
-                      alt={badge.title}
+                      alt={badge.title || badge.setID}
                       className="w-full h-full"
                     />
                   </div>

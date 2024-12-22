@@ -6,18 +6,17 @@ export interface Badge {
 }
 
 export interface ChatMessage {
-  id: string;
-  channel: string;
-  commenter: {
-    display_name: string;
-    _id: string;
-  };
   message: {
     body: string;
     timestamp: string;
     is_action: boolean;
   };
-  badges: Badge[];
+  commenter: {
+    display_name: string;
+  };
+  badges: {
+    [key: string]: string;
+  };
 }
 
 export interface ChatResponse {
