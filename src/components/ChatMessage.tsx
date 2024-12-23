@@ -4,6 +4,7 @@ import { de } from 'date-fns/locale';
 import { useEffect, useState, useMemo } from 'react';
 import { fetchUserProfile } from '@/services/twitchService';
 import { getBadgeUrl } from '@/services/badgeService';
+import { getEmotesForChannel, replaceEmotesInText } from '@/services/emoteService';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -50,6 +51,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [chatColor, setChatColor] = useState<string>('#9147FF');
   const [badgeUrls, setBadgeUrls] = useState<Map<string, string>>(new Map());
+  const [emotes, setEmotes] = useState<Map<string, EmoteData>>(new Map());
   
   useEffect(() => {
     async function loadProfileData() {
@@ -110,6 +112,14 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
     loadBadgeUrls();
   }, [message.badges]);
+
+  useEffect(() => {
+    async function loadEmotes() {
+      const channelEmotes = await getEmotesForChannel(message.channel);
+      setEmotes(channelEmotes);
+    }
+    loadEmotes();
+  }, [message.channel]);
 
  
   const badges = useMemo(() => {
@@ -191,7 +201,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           <div className="relative">
             <p className={`text-gray-800 dark:text-gray-200 break-words leading-relaxed
                         ${message.message.is_action ? 'italic text-purple-600 dark:text-purple-400' : ''}`}>
-              {message.message.body}
+              {replaceEmotesInText(message.message.body, emotes)}
             </p>
           </div>
         </div>

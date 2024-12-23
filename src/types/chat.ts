@@ -17,6 +17,7 @@ export interface ChatMessage {
   badges: {
     [key: string]: string;
   };
+  channel: string;
 }
 
 export interface ChatResponse {
