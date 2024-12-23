@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest) {
 
     const data = await response.json();
     
-    // Erstelle eine Liste aller verfügbaren Badge-IDs und ihrer Versionen
+  
     const badgeMap = data.reduce((acc: Record<string, string[]>, badge: any) => {
       acc[badge.set_id] = badge.versions.map((v: any) => v.id);
       return acc;

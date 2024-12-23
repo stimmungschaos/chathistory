@@ -12,12 +12,11 @@ interface TwitchUser {
   }[];
 }
 
-// Cache für Profilbilder
 const profileCache = new Map<string, TwitchUser>();
 
 export async function fetchUserProfile(username: string): Promise<TwitchUser | null> {
   try {
-    // Prüfe zuerst den Cache
+ 
     if (profileCache.has(username)) {
       return profileCache.get(username) || null;
     }
@@ -41,7 +40,7 @@ export async function fetchUserProfile(username: string): Promise<TwitchUser | n
       badges: data.badges || []
     };
 
-    // Speichere im Cache
+  
     profileCache.set(username, user);
     
     return user;

@@ -9,7 +9,7 @@ export async function GET(_request: NextRequest) {
         'Accept': 'application/json',
         'User-Agent': 'TwitchChatHistory/1.0'
       },
-      next: { revalidate: 86400 } // Cache für 24 Stunden
+      next: { revalidate: 86400 } 
     });
 
     if (!response.ok) {

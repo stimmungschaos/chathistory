@@ -23,9 +23,9 @@ interface UserBadge {
   version: string;
 }
 
-// Versuche den Cache aus dem localStorage zu laden
+
 const loadCache = () => {
-  // Prüfe ob wir im Browser sind
+ 
   if (typeof window === 'undefined') {
     return new Map();
   }
@@ -43,9 +43,9 @@ const loadCache = () => {
 
 const badgeCache = loadCache();
 
-// Speichere den Cache wenn neue URLs hinzugefügt werden
+
 const saveCache = (key: string, value: string) => {
-  // Prüfe ob wir im Browser sind
+ 
   if (typeof window === 'undefined') {
     return;
   }
@@ -59,46 +59,49 @@ const saveCache = (key: string, value: string) => {
   }
 };
 
-// Badge ID Mapping
+
 const BADGE_ID_MAP: Record<string, string> = {
-  '1': 'moderator',      // Mod Badge
-  '2': 'broadcaster',    // Streamer Badge
-  '3': 'staff',         // Twitch Staff
-  '4': 'admin',         // Twitch Admin
-  '5': 'global_mod',    // Global Mod
+ 
+  'moderator': 'moderator',
+  'broadcaster': 'broadcaster',
+  'staff': 'staff',
+ 
+  'vip': 'vip',
   
-  // Subscriber & Premium Badges
-  '0': 'subscriber',     // Sub Badge
-  '6': 'turbo',         // Turbo User
-  '7': 'partner',       // Partner
-  '8': 'premium',       // Premium User
+
+  'subscriber': 'subscriber',
+  'turbo': 'turbo',
+  'partner': 'partner',
+  'prime': 'prime',
   
-  // Special Badges
-  '9': 'bits',          // Bits Badge
-  '10': 'sub-gift-leader', // Sub Gift Leader
-  '11': 'sub-gifter',   // Sub Gifter
-  '12': 'hype-train',   // Hype Train
-  '13': 'vip',          // VIP
-  '14': 'founder',      // Channel Founder
+
+  'bits': 'bits',
+  'sub-gift-leader': 'sub-gift-leader',
+  'sub-gifter': 'sub-gifter',
+  'hype-train': 'hype-train',
+  'founder': 'founder',
   
-  // Weitere häufige Badges
-  '15': 'bits-leader',  // Bits Leader
-  '16': 'clip-champ',   // Clip Champ
-  '17': 'predictions',  // Predictions
-  '18': 'no_video',     // No Video
-  '19': 'no_audio'      // No Audio
+ 
+  'bits-leader': 'bits-leader',
+  'clip-champ': 'clip-champ',
+  'predictions': 'predictions',
+  'no_video': 'no_video',
+  'no_audio': 'no_audio',
+  
+  'muted': 'no_audio',
+  'no-watching': 'no_video'
 };
 
 const DEBUG = process.env.NODE_ENV === 'development';
 
-// Reduziere die Debug-Logs auf das Wesentliche
+
 function debugLog(level: 'debug' | 'warn' | 'error', ...args: any[]) {
   if (!DEBUG && level === 'debug') return;
   
   console[level]('[Badge]', ...args);
 }
 
-// Tracking für wiederholte Logs
+
 const logCounts = new Map<string, number>();
 function shouldLog(key: string, frequency: number = 0.1): boolean {
   if (!DEBUG) return false;
@@ -109,12 +112,11 @@ function shouldLog(key: string, frequency: number = 0.1): boolean {
   return Math.random() < frequency;
 }
 
-// Zusätzliche Debug-Informationen
+
 debugLog('debug', '[Badge] Initialized with mappings:', Object.entries(BADGE_ID_MAP)
   .map(([id, name]) => `${id} -> ${name}`)
   .join(', '));
 
-// Debug-Ausgabe der verfügbaren Mappings
 debugLog('debug', 'Available badge mappings:', 
   Object.entries(BADGE_ID_MAP)
     .map(([id, name]) => `${id} (${name})`)
@@ -129,20 +131,18 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
     return '';
   }
 
-  // Nur mappen wenn es eine numerische ID ist
-  const mappedSetID = /^\d+$/.test(setID) ? BADGE_ID_MAP[setID] || setID : setID;
+
+  const mappedSetID = BADGE_ID_MAP[setID] || setID;
   const normalizedSetID = mappedSetID.replace(/-/g, '_');
-  const cacheKey = `${normalizedSetID}-${versionStr}`;
   
   debugLog('debug', 'Badge lookup:', { 
     input: setID,
-    isNumeric: /^\d+$/.test(setID),
     mapped: mappedSetID,
     normalized: normalizedSetID,
     version: versionStr
   });
 
-  // Reduziere Mapping-Logs
+ 
   if (shouldLog('mapping')) {
     debugLog('debug', 'Mapping badge ID:', { 
       original: setID, 
@@ -151,12 +151,12 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
     });
   }
 
-  if (badgeCache.has(cacheKey)) {
-    // Reduziere Cache-Hit Logs
+  if (badgeCache.has(normalizedSetID)) {
+  
     if (shouldLog('cache', 0.05)) {
       debugLog('debug', `Cache hit for ${normalizedSetID}-${versionStr}`);
     }
-    return badgeCache.get(cacheKey) || '';
+    return badgeCache.get(normalizedSetID) || '';
   }
 
   try {
@@ -182,10 +182,10 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
       availableSets: data.map((b: GlobalBadge) => b.set_id).slice(0, 5)
     });
     
-    // Debug: Liste alle verfügbaren Badge-IDs
+  
     debugLog('debug', '[Badge] Available badge sets:', data.map((b: GlobalBadge) => b.set_id).join(', '));
     
-    // Finde das Badge mit der entsprechenden setID
+
     const badge = data.find((b: GlobalBadge) => b.set_id === normalizedSetID);
     if (!badge) {
       debugLog('warn', `[Badge] Badge not found for setID: "${normalizedSetID}" (original: "${setID}")`);
@@ -193,11 +193,11 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
       return '';
     }
 
-    // Debug: Zeige verfügbare Versionen
+  
     debugLog('debug', `[Badge] Available versions for ${normalizedSetID}:`, 
       badge.versions.map(v => v.id).join(', '));
 
-    // Finde die passende Version
+  
     const badgeVersion = badge.versions.find(v => v.id === versionStr);
     if (!badgeVersion) {
       debugLog('warn', `[Badge] Version "${versionStr}" not found for badge "${normalizedSetID}"`);
@@ -207,7 +207,7 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
 
     const badgeUrl = badgeVersion.image_url_4x;
     debugLog('debug', `[Badge] Found URL for ${normalizedSetID}-${versionStr}: ${badgeUrl}`);
-    saveCache(cacheKey, badgeUrl);
+    saveCache(normalizedSetID, badgeUrl);
     return badgeUrl;
   } catch (error) {
     debugLog('error', '[Badge] Error fetching badge:', error);
@@ -215,7 +215,7 @@ export async function getBadgeUrl(setID?: string, version: string | object = '1'
   }
 }
 
-// Diese Funktion wird nur für die Badges aus der /user route verwendet
+
 export function parseBadges(badgeData: any[]): Badge[] {
   if (!badgeData || !Array.isArray(badgeData)) {
     debugLog('error', '[Badge] No badges or invalid badge data:', badgeData);

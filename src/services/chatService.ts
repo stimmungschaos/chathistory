@@ -4,22 +4,19 @@ const API_BASE_URL = 'https://recent-messages.robotty.de/api/v2';
 
 function parseIRCMessage(rawMessage: string) {
   const parts: { [key: string]: string } = {};
-  
-  // Parse Tags
+
   if (rawMessage.startsWith('@')) {
     const [tagsSection, ...messageParts] = rawMessage.split(' ');
-    const tags = tagsSection.slice(1).split(';'); // Remove @ and split tags
-    
+    const tags = tagsSection.slice(1).split(';'); 
     tags.forEach(tag => {
       const [key, value] = tag.split('=');
       parts[key] = value;
     });
     
-    // Rekonstruiere die Nachricht ohne Tags
+    
     rawMessage = messageParts.join(' ');
   }
 
-  // Finde den tatsächlichen Nachrichteninhalt
   const matches = rawMessage.match(/:(\S+)!\S+ PRIVMSG #(\S+) :(.+)$/);
   if (!matches) return null;
 

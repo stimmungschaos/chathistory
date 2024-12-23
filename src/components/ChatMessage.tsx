@@ -1,7 +1,7 @@
 import { ChatMessage as ChatMessageType } from '@/types/chat';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { fetchUserProfile } from '@/services/twitchService';
 import { getBadgeUrl } from '@/services/badgeService';
 
@@ -17,7 +17,7 @@ function debugLog(...args: any[]) {
 }
 
 function processBadge(badge: any) {
-  // Für Channel-Badges (Format: { "vip": "1" })
+
   if (typeof badge === 'object' && Object.keys(badge).length === 1) {
     const [setID, version] = Object.entries(badge)[0];
     return {
@@ -26,7 +26,7 @@ function processBadge(badge: any) {
     };
   }
   
-  // Für Homepage-Badges (Format: { setID: "...", version: "..." })
+ 
   if (badge.setID) {
     return {
       setID: badge.setID,
@@ -34,7 +34,15 @@ function processBadge(badge: any) {
     };
   }
 
-  console.warn('[ChatMessage] Unknown badge format:', badge);
+ 
+  if (typeof badge === 'string') {
+    return {
+      setID: badge,
+      version: '1'
+    };
+  }
+
+  debugLog('Unbekanntes Badge-Format:', badge);
   return null;
 }
 
@@ -42,7 +50,6 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [chatColor, setChatColor] = useState<string>('#9147FF');
   const [badgeUrls, setBadgeUrls] = useState<Map<string, string>>(new Map());
-  const timestamp = new Date(parseInt(message.message.timestamp));
   
   useEffect(() => {
     async function loadProfileData() {
@@ -54,54 +61,46 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         }
       }
     }
-    
     loadProfileData();
   }, [message.commenter.display_name]);
 
   useEffect(() => {
     async function loadBadgeUrls() {
-      if (!message.badges || !Array.isArray(message.badges)) {
-        return;
-      }
+      if (!message.badges) return;
 
-      console.log('Raw badge data (stringified):', JSON.stringify(message.badges, null, 2));
-      console.log('Badge data type:', typeof message.badges);
-      console.log('Is array?', Array.isArray(message.badges));
-      console.log('First badge:', message.badges[0]);
-      
       try {
         const urls = new Map<string, string>();
         
-        const badgeEntries = message.badges
-          .map(processBadge)
-          .filter((entry): entry is { setID: string; version: string } => entry !== null);
+       
+        const badgeEntries = Array.isArray(message.badges) 
+          ? message.badges.map(processBadge)
+          : Object.entries(message.badges).map(([setID, version]) => ({
+              setID,
+              version: String(version)
+            }));
 
-        console.log('Processed badge entries:', badgeEntries);
-
-        if (DEBUG && badgeEntries.length > 0) {
-          debugLog('Processing badges:', badgeEntries);
-        }
+       
+        const validBadges = badgeEntries.filter((badge): badge is { setID: string; version: string } => 
+          badge !== null
+        );
 
         const results = await Promise.all(
-          badgeEntries.map(async badge => {
-            const url = await getBadgeUrl(badge.setID, badge.version);
-            return { setID: badge.setID, url };
+          validBadges.map(async badge => {
+            try {
+              const url = await getBadgeUrl(badge.setID, badge.version);
+              return { setID: badge.setID, url };
+            } catch (error) {
+              debugLog(`Fehler beim Laden des Badge ${badge.setID}:`, error);
+              return null;
+            }
           })
         );
 
-        results.forEach(({ setID, url }) => {
-          if (url) {
-            urls.set(setID, url);
-          } else {
-            debugLog('Failed to load URL for badge:', setID);
+        results.forEach(result => {
+          if (result && result.url) {
+            urls.set(result.setID, result.url);
           }
         });
-        
-        if (urls.size > 0) {
-          debugLog('Loaded badge URLs:', [...urls.entries()]);
-        } else {
-          debugLog('No valid badge URLs loaded');
-        }
         
         setBadgeUrls(urls);
       } catch (error) {
@@ -112,23 +111,28 @@ export default function ChatMessage({ message }: ChatMessageProps) {
     loadBadgeUrls();
   }, [message.badges]);
 
-  const badges = Array.isArray(message.badges) 
-    ? message.badges
-        .map(processBadge)
-        .filter((entry): entry is { setID: string; version: string; title: string } => {
-          if (!entry) return false;
-          return { ...entry, title: entry.setID };
-        })
-    : [];
+ 
+  const badges = useMemo(() => {
+    if (!message.badges) return [];
+    
+    const badgeEntries = Array.isArray(message.badges)
+      ? message.badges
+      : Object.entries(message.badges).map(([setID, version]) => ({
+          setID,
+          version: String(version),
+          title: setID.replace(/-/g, ' ').replace(/_/g, ' ')
+        }));
 
-  if (DEBUG && badges.length > 0) {
-    debugLog('Processed badges for rendering:', badges);
-  }
+    return badgeEntries.filter(badge => badge !== null);
+  }, [message.badges]);
 
   return (
-    <div className="group px-4 py-2 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all duration-200">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-purple-100 dark:bg-purple-900/30">
+    <div className="group px-4 py-3 hover:bg-gray-50/80 dark:hover:bg-gray-700/50 
+                    rounded-lg transition-all duration-200">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden 
+                      bg-purple-100 dark:bg-purple-900/30 ring-2 ring-purple-200 
+                      dark:ring-purple-800">
           {profileImage ? (
             <img 
               src={profileImage} 
@@ -137,7 +141,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+              <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
                 {message.commenter.display_name.charAt(0).toUpperCase()}
               </span>
             </div>
@@ -145,24 +149,22 @@ export default function ChatMessage({ message }: ChatMessageProps) {
         </div>
         
         <div className="flex-grow min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <div className="flex -space-x-1">
               {badges.map((badge, index) => {
                 const badgeUrl = badgeUrls.get(badge.setID);
-                if (!badgeUrl) {
-                  debugLog('No URL for badge:', badge.setID);
-                  return null;
-                }
+                if (!badgeUrl) return null;
                 
                 return (
                   <div 
                     key={`${badge.setID}-${index}`}
-                    className="w-4 h-4 rounded-full overflow-hidden ring-1 ring-white dark:ring-gray-800"
-                    title={badge.title || badge.setID}
+                    className="w-5 h-5 rounded-full overflow-hidden ring-2 ring-white 
+                             dark:ring-gray-800 hover:z-10 transition-all duration-200"
+                    title={badge.title}
                   >
                     <img 
                       src={badgeUrl}
-                      alt={badge.title || badge.setID}
+                      alt={badge.title}
                       className="w-full h-full"
                     />
                   </div>
@@ -171,21 +173,24 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             </div>
             
             <span 
-              className="font-medium truncate"
+              className="font-semibold truncate"
               style={{ color: chatColor }}
             >
               {message.commenter.display_name}
             </span>
             
-            <span className="text-xs text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
-              {formatDistanceToNow(timestamp, { addSuffix: true, locale: de })}
+            <span className="text-xs text-gray-400 dark:text-gray-500 opacity-0 
+                           group-hover:opacity-100 transition-opacity duration-200">
+              {formatDistanceToNow(new Date(parseInt(message.message.timestamp)), { 
+                addSuffix: true, 
+                locale: de 
+              })}
             </span>
           </div>
           
           <div className="relative">
-            <p className={`text-gray-800 dark:text-gray-200 break-words ${
-              message.message.is_action ? 'italic text-purple-600 dark:text-purple-400' : ''
-            }`}>
+            <p className={`text-gray-800 dark:text-gray-200 break-words leading-relaxed
+                        ${message.message.is_action ? 'italic text-purple-600 dark:text-purple-400' : ''}`}>
               {message.message.body}
             </p>
           </div>
