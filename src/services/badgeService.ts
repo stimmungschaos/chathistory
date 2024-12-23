@@ -25,6 +25,11 @@ interface UserBadge {
 
 // Versuche den Cache aus dem localStorage zu laden
 const loadCache = () => {
+  // Prüfe ob wir im Browser sind
+  if (typeof window === 'undefined') {
+    return new Map();
+  }
+
   try {
     const cached = localStorage.getItem('badge-cache');
     if (cached) {
@@ -40,6 +45,11 @@ const badgeCache = loadCache();
 
 // Speichere den Cache wenn neue URLs hinzugefügt werden
 const saveCache = (key: string, value: string) => {
+  // Prüfe ob wir im Browser sind
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   badgeCache.set(key, value);
   try {
     localStorage.setItem('badge-cache', 
